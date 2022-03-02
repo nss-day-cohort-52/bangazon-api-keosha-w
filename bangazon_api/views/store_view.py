@@ -3,6 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from django.db.models import Q, Count
+from bangazon_api.models import Favorite
+from rest_framework.decorators import action
 
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -104,3 +106,27 @@ class StoreView(ViewSet):
             return Response({'message': ex.args[0]}, status=status.HTTP_400_BAD_REQUEST)
         except Store.DoesNotExist as ex:
             return Response({'message': ex.args[0]}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(methods=['post'], detail=True)
+    def favorite(self, request, pk):
+        """Favorite a store"""
+
+        customer = request.auth.user
+        store = Store.objects.get(pk=pk)
+        Favorite.objects.create(
+            customer=customer, 
+            store=store
+        )
+        return Response({'message': 'store favorited'}, status=status.HTTP_201_CREATED)
+        
+    @action(methods=['delete'], detail=True)
+    def unfavorite(self, request, pk):
+       """unfavorite a store"""
+       customer = request.auth.user
+       store = Store.objects.get(pk=pk)
+       favorite = Favorite.objects.get(
+            customer = customer, 
+            store = store
+        )
+       favorite.delete()
+       return Response({'message': 'Store was removed from favorites'}, status=status.HTTP_204_NO_CONTENT)

@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from django.db.models import Count
+from django.db.models import Count, Q
 from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 from rest_framework import status
@@ -166,12 +166,22 @@ class ProductView(ViewSet):
         order = request.query_params.get('order_by', None)
         direction = request.query_params.get('direction', None)
         name = request.query_params.get('name', None)
+        min_price = request.query_params.get('min_price', None)
+        location = request.query_params.get('location', None)
 
         if number_sold:
             products = products.annotate(
-                order_count=Count('orders')
-            ).filter(order_count__lt=number_sold)
+                order_count=Count('orders',
+                                  filter=~Q(orders__payment_type=None) # tilda Q is filering the orders by payment type. Since we don't have access to the payment type directly we have to use dunder to access the orders
+                                  )
+            ).filter(order_count__gte=number_sold)
 
+        if min_price:
+            products = products.filter(price__gte=min_price)
+            
+        if location:
+            products = products.filter(location__contains=location)
+            
         if order is not None:
             order_filter = f'-{order}' if direction == 'desc' else order
             products = products.order_by(order_filter)
@@ -181,6 +191,8 @@ class ProductView(ViewSet):
 
         if name is not None:
             products = products.filter(name__icontains=name)
+            
+    
 
         serializer = ProductSerializer(products, many=True)
         return Response(serializer.data)
@@ -251,6 +263,7 @@ class ProductView(ViewSet):
             product = Product.objects.get(pk=pk)
             order = Order.objects.get(
                 user=request.auth.user, completed_on=None)
+            order.products.remove(product)
             return Response(None, status=status.HTTP_204_NO_CONTENT)
         except Product.DoesNotExist as ex:
             return Response({'message': ex.args[0]}, status=status.HTTP_404_NOT_FOUND)

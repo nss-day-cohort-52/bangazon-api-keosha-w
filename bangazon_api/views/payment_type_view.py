@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from bangazon_api import serializers
 from bangazon_api.models import PaymentType
 from bangazon_api.serializers import (
     PaymentTypeSerializer, MessageSerializer, CreatePaymentType)
@@ -18,10 +19,22 @@ class PaymentTypeView(ViewSet):
     })
     def list(self, request):
         """Get a list of payment types for the current user"""
-        payment_types = PaymentType.objects.all()
+        payment_types = PaymentType.objects.filter(customer=request.auth.user)
         serializer = PaymentTypeSerializer(payment_types, many=True)
         return Response(serializer.data)
-
+    
+    
+    def retrieve(self, request, pk):
+        """Handle GET requests for single game type
+        
+        Returns: 
+            Response --- JSON serialized game type
+        """
+        payment_type = PaymentType.objects.get(pk=pk)
+        serializer = PaymentTypeSerializer(payment_type, context={'request': request})
+        return Response(serializer.data)
+    
+    
     @swagger_auto_schema(
         request_body=CreatePaymentType,
         responses={
@@ -40,8 +53,8 @@ class PaymentTypeView(ViewSet):
         try:
             payment_type = PaymentType.objects.create(
                 customer=request.auth.user,
-                merchant_name=request.data['acctNumber'],
-                acct_number=request.data['merchant']
+                merchant_name=request.data['merchant'],
+                acct_number=request.data['acctNumber']
             )
             serializer = PaymentTypeSerializer(payment_type)
             return Response(serializer.data, status=status.HTTP_201_CREATED)

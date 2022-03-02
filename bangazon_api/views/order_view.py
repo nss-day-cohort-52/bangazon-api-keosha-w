@@ -6,7 +6,7 @@ from rest_framework.decorators import action
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
-from bangazon_api.models import Order, PaymentType
+from bangazon_api.models import Order, PaymentType, payment_type
 from bangazon_api.serializers import OrderSerializer, UpdateOrderSerializer
 from bangazon_api.serializers.message_serializer import MessageSerializer
 
@@ -65,9 +65,23 @@ class OrderView(ViewSet):
                 pk=request.data['paymentTypeId'], customer=request.auth.user)
             order.payment_type = payment_type
             order.completed_on = datetime.now()
+            order.save()
             return Response({'message': "Order Completed"})
         except (Order.DoesNotExist, PaymentType.DoesNotExist) as ex:
             return Response({'message': ex.args[0]}, status=status.HTTP_404_NOT_FOUND)
+
+    def create(self, request):
+        """Create an order for the current user"""
+        user = request.auth.user
+        payment_type = PaymentType.objects.get(pk=request.data['payment_type'])
+        order = Order.objects.create(
+            created_on = request.data['created_on'], 
+            completed_on = request.data['completed_on'], 
+            payment_type_id = payment_type,
+            user_id = user,
+        )
+        serializer = OrderSerializer(order)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @swagger_auto_schema(
         method='get',
